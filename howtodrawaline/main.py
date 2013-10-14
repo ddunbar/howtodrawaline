@@ -20,31 +20,38 @@ class HowToDrawALineProxy(pylive.window.WindowProxy):
     def __init__(self, window, last_proxy=None):
         super(HowToDrawALineProxy, self).__init__(window)
         self.frame = 0
-        self.animate = False
-        self.use_gl = False
         self.start_time = time.time()
+
+        # Bind several debug widgets.
+        self.animate = self.bind_debug_widget(
+            "animate", bool, False, False, True)
+        self.use_gl = self.bind_debug_widget(
+            "use_gl", bool, False, False, True)
+        self.circle_num_points = self.bind_debug_widget(
+            "circle_num_points", int, 60, 3, 1000)
+        self.pinwheel_num_lines = self.bind_debug_widget(
+            "pinwheel_num_lines", int, 8, 1, 64)
 
         # Recover state on a reload.
         if last_proxy is not None:
             self.frame = last_proxy.frame
-            self.animate = last_proxy.animate
-            self.use_gl = last_proxy.use_gl
             self.start_time = last_proxy.start_time
 
     def on_idle(self):
-        if self.animate:
+        if self.animate.value:
             self.window.update()
 
     def on_special(self, key, x, y):
         if key == ord('a'):
-            self.animate = not self.animate
+            self.animate.value = not self.animate.value
+            self.window.update()
         elif key == ord('g'):
-            self.use_gl = not self.use_gl
+            self.use_gl.value = not self.use_gl.value
             self.window.update()
 
     def on_draw(self):
         # Handle animation.
-        if self.animate:
+        if self.animate.value:
             self.frame += 1
 
         self.animtime = time.time() - self.start_time
@@ -54,8 +61,8 @@ class HowToDrawALineProxy(pylive.window.WindowProxy):
         glRectf(0, 0, (self.frame/10. % self.window.width), 12)
         glColor3f(.5, .5, .5)
         draw_string(1, 1, "Use GL: %s, Animate: %s, Time: %.2fs" % (
-            "Yes" if self.use_gl else "No",
-            "Yes" if self.animate else "No",
+            "Yes" if self.use_gl.value else "No",
+            "Yes" if self.animate.value else "No",
             self.animtime))
 
         # Enable several displays of our line drawing algorithm, along a grid.
@@ -85,6 +92,8 @@ class HowToDrawALineProxy(pylive.window.WindowProxy):
                     display = self.display_simple_lines
                 elif (column, row) == (1, 1):
                     display = self.display_circle
+                elif (column, row) == (0, 0):
+                    display = self.display_pinwheel
                 else:
                     display = None
                 if display is not None:
@@ -95,7 +104,7 @@ class HowToDrawALineProxy(pylive.window.WindowProxy):
         rows = 3
         columns = 3
         glColor3f(0, 0, 0)
-        glBegin(GL_LINES if self.use_gl else GL_POINTS)
+        glBegin(GL_LINES if self.use_gl.value else GL_POINTS)
         l = min(float(w)/columns, float(h)/rows) * .8
         for i in range(columns):
             for j in range(rows):
@@ -107,7 +116,7 @@ class HowToDrawALineProxy(pylive.window.WindowProxy):
                 y0 = y + int(cy - math.sin(r)*l*.5)
                 x1 = x + int(cx + math.cos(r)*l*.5)
                 y1 = y + int(cy + math.sin(r)*l*.5)
-                if self.use_gl:
+                if self.use_gl.value:
                     glVertex2f(x0 - 0.375, y0 - 0.375)
                     glVertex2f(x1 - 0.375, y1 - 0.375)
                 else:
@@ -116,7 +125,7 @@ class HowToDrawALineProxy(pylive.window.WindowProxy):
         glEnd()
 
     def display_circle(self, x, y, w, h):
-        N = 60 # + int(self.frame/10. % 20)
+        N = self.circle_num_points.value # + int(self.frame/10. % 20)
         angle_offset = math.fmod(self.animtime*.01, 1.)
         cx = x + w/2.
         cy = y + h/2.
@@ -126,7 +135,7 @@ class HowToDrawALineProxy(pylive.window.WindowProxy):
         glEnable(GL_BLEND)
 
         glColor4f(.5, .5, .5, .5)
-        glBegin(GL_LINES if self.use_gl else GL_POINTS)
+        glBegin(GL_LINES if self.use_gl.value else GL_POINTS)
         for i in range(N):
             t_0 = float(i) / N
             t_1 = float(i + 1) / N
@@ -136,7 +145,48 @@ class HowToDrawALineProxy(pylive.window.WindowProxy):
             y0 = cx + math.sin(a_0)*l*.5
             x1 = cx + math.cos(a_1)*l*.5
             y1 = cx + math.sin(a_1)*l*.5
-            if self.use_gl:
+            if self.use_gl.value:
+                glVertex2f(x0, y0)
+                glVertex2f(x1, y1)
+            else:
+                for pt in line.line2d(x0, y0, x1, y1):
+                    glVertex2fv(pt)
+        glEnd()
+
+    def display_pinwheel(self, x, y, w, h):
+        N = self.circle_num_points.value # + int(self.frame/10. % 20)
+        angle_offset = math.fmod(self.animtime*.01, 1.)
+        cx = x + w/2.
+        cy = y + h/2.
+        l = min(w,h) * .8
+
+        glColor3f(0, 0, 0)
+        glBegin(GL_LINES if self.use_gl.value else GL_POINTS)
+        for i in range(N):
+            t_0 = float(i) / N
+            t_1 = float(i + 1) / N
+            a_0 = 2*math.pi * t_0 + angle_offset * 2 * math.pi
+            a_1 = 2*math.pi * t_1 + angle_offset * 2 * math.pi
+            x0 = cx + math.cos(a_0)*l*.5
+            y0 = cy + math.sin(a_0)*l*.5
+            x1 = cx + math.cos(a_1)*l*.5
+            y1 = cy + math.sin(a_1)*l*.5
+            if self.use_gl.value:
+                glVertex2f(x0, y0)
+                glVertex2f(x1, y1)
+            else:
+                for pt in line.line2d(x0, y0, x1, y1):
+                    glVertex2fv(pt)
+
+        num_lines = self.pinwheel_num_lines.value
+        for i in range(num_lines):
+            t = float(i) / num_lines
+            angle = self.animtime * .1 + t * math.pi
+            x0 = cx - math.cos(angle)*l*.5
+            y0 = cy - math.sin(angle)*l*.5
+            x1 = cx + math.cos(angle)*l*.5
+            y1 = cy + math.sin(angle)*l*.5
+            if self.use_gl.value:
                 glVertex2f(x0, y0)
                 glVertex2f(x1, y1)
             else:

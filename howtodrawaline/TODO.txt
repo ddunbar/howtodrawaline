@@ -1,0 +1,7 @@
+======
+ TODO
+======
+
+Need some kind of support for zooming.
+
+Way to switch between the different panes, make one full screen or not.
