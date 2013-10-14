@@ -21,21 +21,26 @@ class HowToDrawALineProxy(pylive.window.WindowProxy):
         super(HowToDrawALineProxy, self).__init__(window)
         self.frame = 0
         self.start_time = time.time()
+        self.last_frame_time = None
+        self.animtime = 0.0
 
         # Bind several debug widgets.
         self.animate = self.bind_debug_widget(
-            "animate", bool, False, False, True)
+            "animate", bool, True, False, True)
         self.use_gl = self.bind_debug_widget(
             "use_gl", bool, False, False, True)
         self.circle_num_points = self.bind_debug_widget(
             "circle_num_points", int, 60, 3, 1000)
         self.pinwheel_num_lines = self.bind_debug_widget(
             "pinwheel_num_lines", int, 8, 1, 64)
+        self.animation_speed = self.bind_debug_widget(
+            "animation_speed", float, 1.0, 0.0, 100.0)
 
         # Recover state on a reload.
         if last_proxy is not None:
             self.frame = last_proxy.frame
             self.start_time = last_proxy.start_time
+            self.animtime = getattr(last_proxy, 'animtime', 0.0)
 
     def on_idle(self):
         if self.animate.value:
@@ -54,7 +59,11 @@ class HowToDrawALineProxy(pylive.window.WindowProxy):
         if self.animate.value:
             self.frame += 1
 
-        self.animtime = time.time() - self.start_time
+        current_time = time.time()
+        if self.last_frame_time is not None:
+            dtime = current_time - self.last_frame_time
+            self.animtime += self.animation_speed.value * dtime
+        self.last_frame_time = current_time
 
         # Draw a silly progress bar across the bottom.
         glColor3f(.9, .9, .9)
