@@ -49,6 +49,7 @@ class HowToDrawALineProxy(pylive.window.WindowProxy):
     def on_special(self, key, x, y):
         if key == ord('a'):
             self.animate.value = not self.animate.value
+            self.last_frame_time = time.time()
             self.window.update()
         elif key == ord('g'):
             self.use_gl.value = not self.use_gl.value
@@ -60,7 +61,7 @@ class HowToDrawALineProxy(pylive.window.WindowProxy):
             self.frame += 1
 
         current_time = time.time()
-        if self.last_frame_time is not None:
+        if self.last_frame_time is not None and self.animate.value:
             dtime = current_time - self.last_frame_time
             self.animtime += self.animation_speed.value * dtime
         self.last_frame_time = current_time
@@ -91,10 +92,10 @@ class HowToDrawALineProxy(pylive.window.WindowProxy):
                 y = bottom_padding + padding + row * (cell_height + padding)
                 glColor3f(0, 0, 0)
                 glBegin(GL_LINE_LOOP)
-                glVertex2f(x, y)
-                glVertex2f(x + cell_width, y)
-                glVertex2f(x + cell_width, y + cell_height)
-                glVertex2f(x, y + cell_height)
+                glVertex2f(x - 0.375, y - 0.375)
+                glVertex2f(x + cell_width - 0.375, y - 0.375)
+                glVertex2f(x + cell_width - 0.375, y + cell_height - 0.375)
+                glVertex2f(x - 0.375, y + cell_height - 0.375)
                 glEnd()
 
                 if (column, row) == (0, 1):
@@ -155,8 +156,8 @@ class HowToDrawALineProxy(pylive.window.WindowProxy):
             x1 = cx + math.cos(a_1)*l*.5
             y1 = cx + math.sin(a_1)*l*.5
             if self.use_gl.value:
-                glVertex2f(x0, y0)
-                glVertex2f(x1, y1)
+                glVertex2f(x0 - 0.375, y0 - 0.375)
+                glVertex2f(x1 - 0.375, y1 - 0.375)
             else:
                 for pt in line.line2d(x0, y0, x1, y1):
                     glVertex2fv(pt)
@@ -181,8 +182,8 @@ class HowToDrawALineProxy(pylive.window.WindowProxy):
             x1 = cx + math.cos(a_1)*l*.5
             y1 = cy + math.sin(a_1)*l*.5
             if self.use_gl.value:
-                glVertex2f(x0, y0)
-                glVertex2f(x1, y1)
+                glVertex2f(x0 - 0.375, y0 - 0.375)
+                glVertex2f(x1 - 0.375, y1 - 0.375)
             else:
                 for pt in line.line2d(x0, y0, x1, y1):
                     glVertex2fv(pt)
@@ -196,8 +197,8 @@ class HowToDrawALineProxy(pylive.window.WindowProxy):
             x1 = cx + math.cos(angle)*l*.5
             y1 = cy + math.sin(angle)*l*.5
             if self.use_gl.value:
-                glVertex2f(x0, y0)
-                glVertex2f(x1, y1)
+                glVertex2f(x0 - 0.375, y0 - 0.375)
+                glVertex2f(x1 - 0.375, y1 - 0.375)
             else:
                 for pt in line.line2d(x0, y0, x1, y1):
                     glVertex2fv(pt)
