@@ -30,8 +30,8 @@ def line2d_norm(x0, y0, x1, y1):
     y_up = y1 >= y0
     y_inc = 1 if y_up else -1
 
-    error = -i_dx
-    delta_error = 2*abs_i_dy
+    error = 0 * i_dx
+    delta_error = abs_i_dy
 
     i_x = int(x0)
     i_y = int(y0)
@@ -40,8 +40,8 @@ def line2d_norm(x0, y0, x1, y1):
         yield (i_x, i_y)
 
         error = error + delta_error
-        if error >= 0:
+        if error / abs_i_dx >= .5:
             i_y += y_inc
-            error = error - 2*abs_i_dx
+            error = error - abs_i_dx
 
         i_x += inc

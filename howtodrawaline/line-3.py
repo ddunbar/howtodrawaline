@@ -18,30 +18,26 @@ def line2d_norm(x0, y0, x1, y1):
     """Bresenham's Algorithm"""
     assert abs(x0 - x1) >= abs(y0 - y1)
 
-    i_dx = int(x1 - x0)
-    i_dy = int(y1 - y0)
-    abs_i_dx = abs(i_dx)
-    abs_i_dy = abs(i_dy)
-    inc = 1 if i_dx >= 0 else -1
+    inc = 1 if x1 > x0 else -1
 
-    m = i_dy
+    m = safediv(y1 - y0, x1 - x0)
 
     # Determine if we are moving up or down in Y.
     y_up = y1 >= y0
     y_inc = 1 if y_up else -1
 
-    error = -i_dx
-    delta_error = 2*abs_i_dy
+    error = 0.
+    delta_error = abs(m)
 
     i_x = int(x0)
     i_y = int(y0)
     i_x1 = int(x1)
-    for i in range(abs_i_dx):
+    while i_x != i_x1:
         yield (i_x, i_y)
 
         error = error + delta_error
-        if error >= 0:
+        if error >= .5:
             i_y += y_inc
-            error = error - 2*abs_i_dx
+            error = error - 1
 
         i_x += inc
