@@ -29,7 +29,7 @@ class HowToDrawALineProxy(pylive.window.WindowProxy):
         self.use_gl = self.bind_debug_widget(
             "use_gl", bool, False, False, True)
         self.circle_num_points = self.bind_debug_widget(
-            "circle_num_points", int, 60, 3, 1000)
+            "circle_num_points", int, 20, 3, 1000)
         self.pinwheel_num_lines = self.bind_debug_widget(
             "pinwheel_num_lines", int, 8, 1, 64)
         self.animation_speed = self.bind_debug_widget(
@@ -40,6 +40,7 @@ class HowToDrawALineProxy(pylive.window.WindowProxy):
         self.frame = getattr(last_proxy, 'frame', 0)
         self.start_time = getattr(last_proxy, 'start_time', time.time())
         self.animtime = getattr(last_proxy, 'animtime', 0.0)
+        self.active_panel = getattr(last_proxy, 'active_panel', -1)
 
     def on_idle(self):
         if self.animate.value:
@@ -53,7 +54,7 @@ class HowToDrawALineProxy(pylive.window.WindowProxy):
         elif key == ord('t'):
             self.transparent.value = not self.transparent.value
             self.window.update()
-        elif key == ord('g'):
+        elif key == ord('o'):
             self.use_gl.value = not self.use_gl.value
             self.window.update()
         elif key >= ord('1') and key <= ord('9'):
@@ -71,7 +72,22 @@ class HowToDrawALineProxy(pylive.window.WindowProxy):
                 else:
                     self.panels.append(panel)
                 self.window.update()
-            
+        elif key == GLUT_KEY_LEFT:
+            self.active_panel = max(self.active_panel - 1, -1)
+            self.window.update()
+        elif key == GLUT_KEY_RIGHT:
+            self.active_panel = min(self.active_panel + 1, len(self.panels) - 1)
+            self.window.update()
+        elif key == GLUT_KEY_UP or key == GLUT_KEY_DOWN:
+            if self.active_panel < len(self.panels):
+                panel = self.panels[self.active_panel]
+                inc = -1 if key == GLUT_KEY_DOWN else 1
+                if panel == 'display_circle':
+                    self.circle_num_points.value += inc
+                elif panel == 'display_pinwheel':
+                    self.pinwheel_num_lines.value += inc
+                self.window.update()
+
     def on_draw(self):
         # Handle animation.
         if self.animate.value:
@@ -113,7 +129,7 @@ class HowToDrawALineProxy(pylive.window.WindowProxy):
         
         for column in range(columns):
             for row in range(rows):
-                panel_idx = column * rows + row
+                panel_idx = row * columns + column
                 if panel_idx >= len(self.panels):
                     break
 
@@ -121,7 +137,10 @@ class HowToDrawALineProxy(pylive.window.WindowProxy):
                 
                 x = padding + column * (cell_width + padding)
                 y = bottom_padding + padding + row * (cell_height + padding)
-                glColor3f(0, 0, 0)
+                if panel_idx == self.active_panel:
+                    glColor3f(.7, 0, 0)
+                else:
+                    glColor3f(0, 0, 0)
                 glBegin(GL_LINE_LOOP)
                 glVertex2f(x, y)
                 glVertex2f(x + cell_width, y)
