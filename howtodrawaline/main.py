@@ -57,10 +57,13 @@ class HowToDrawALineProxy(pylive.window.WindowProxy):
             self.use_gl.value = not self.use_gl.value
             self.window.update()
         elif key >= ord('1') and key <= ord('9'):
-            panel = { '1' : 'display_trivial_lines',
-                      '2' : 'display_simple_lines',
-                      '3' : 'display_circle',
-                      '4' : 'display_pinwheel' }.get(chr(key))
+            panel = {
+                '1' : 'display_trivial_lines',
+                '2' : 'display_simple_lines',
+                '3' : 'display_circle',
+                '4' : 'display_pinwheel',
+                '5' : 'display_slow_moving_line',
+            }.get(chr(key))
             if panel is not None:
                 # Remove the panel, if it exists.
                 if panel in self.panels:
@@ -250,6 +253,22 @@ class HowToDrawALineProxy(pylive.window.WindowProxy):
             else:
                 for pt in line.line2d(x0, y0, x1, y1):
                     glVertex2fv(pt)
+        glEnd()
+
+    def display_slow_moving_line(self, x, y, w, h):
+        x0 = x + 5
+        x1 = x + w - 10
+        y0 = y + 5 + (h - 10) * math.fmod(self.animtime * .01, 1.0)
+        y1 = y0 + 1
+
+        glColor3f(0, 0, 0)
+        glBegin(GL_LINES if self.use_gl.value else GL_POINTS)
+        if self.use_gl.value:
+            glVertex2f(x0 - 0.375, y0 - 0.375)
+            glVertex2f(x1 - 0.375, y1 - 0.375)
+        else:
+            for pt in line.line2d(x0, y0, x1, y1):
+                glVertex2fv(pt)
         glEnd()
 
 def register_pylive(window, last_proxy=None):
