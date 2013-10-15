@@ -24,6 +24,8 @@ class HowToDrawALineProxy(pylive.window.WindowProxy):
         # Bind several debug widgets.
         self.animate = self.bind_debug_widget(
             "animate", bool, True, False, True)
+        self.transparent = self.bind_debug_widget(
+            "transparent", bool, False, False, True)
         self.use_gl = self.bind_debug_widget(
             "use_gl", bool, False, False, True)
         self.circle_num_points = self.bind_debug_widget(
@@ -47,6 +49,9 @@ class HowToDrawALineProxy(pylive.window.WindowProxy):
         if key == ord('a'):
             self.animate.value = not self.animate.value
             self.last_frame_time = time.time()
+            self.window.update()
+        elif key == ord('t'):
+            self.transparent.value = not self.transparent.value
             self.window.update()
         elif key == ord('g'):
             self.use_gl.value = not self.use_gl.value
@@ -179,10 +184,13 @@ class HowToDrawALineProxy(pylive.window.WindowProxy):
         cy = y + h/2.
         l = min(w,h) * .8
 
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-        glEnable(GL_BLEND)
+        if self.transparent.value:
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+            glEnable(GL_BLEND)
+            glColor4f(0., 0., 0., .5)
+        else:
+            glColor3f(0, 0, 0)
 
-        glColor4f(.5, .5, .5, .5)
         glBegin(GL_LINES if self.use_gl.value else GL_POINTS)
         for i in range(N):
             t_0 = float(i) / N
@@ -200,6 +208,8 @@ class HowToDrawALineProxy(pylive.window.WindowProxy):
                 for pt in line.line2d(x0, y0, x1, y1):
                     glVertex2fv(pt)
         glEnd()
+
+        glDisable(GL_BLEND)
 
     def display_pinwheel(self, x, y, w, h):
         N = self.circle_num_points.value # + int(self.frame/10. % 20)
