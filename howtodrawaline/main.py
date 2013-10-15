@@ -224,7 +224,7 @@ class HowToDrawALineProxy(pylive.window.WindowProxy):
                    (y0t > h and y1t > h):
                     continue
 
-                for x,y in line.line2d(x0, y0, x1, y1):
+                for x,y in line_impl(x0, y0, x1, y1):
                     for i in range(zoom):
                         for j in range(zoom):
                             glVertex2f(x*zoom + i + +.5, y*zoom + j + +.5)
