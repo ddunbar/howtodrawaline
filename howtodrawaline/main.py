@@ -8,8 +8,15 @@ from OpenGL.GL import *
 import pylive.window
 
 import line
-reload(line)
-import line
+import linegl
+
+def clamp(value, lower, upper):
+    if value <= lower:
+        return lower
+    elif value >= upper:
+        return upper
+    else:
+        return value
 
 def draw_string(x, y, string):
     glRasterPos2f(x, y)
@@ -23,17 +30,21 @@ class HowToDrawALineProxy(pylive.window.WindowProxy):
 
         # Bind several debug widgets.
         self.animate = self.bind_debug_widget(
-            "animate", bool, True, False, True)
+            "animate", bool, False, False, True)
         self.transparent = self.bind_debug_widget(
             "transparent", bool, False, False, True)
         self.use_gl = self.bind_debug_widget(
             "use_gl", bool, False, False, True)
+        self.pan_enabled = self.bind_debug_widget(
+            "pan_enabled", bool, True, False, True)
         self.circle_num_points = self.bind_debug_widget(
             "circle_num_points", int, 20, 3, 1000)
         self.pinwheel_num_lines = self.bind_debug_widget(
             "pinwheel_num_lines", int, 8, 1, 64)
         self.animation_speed = self.bind_debug_widget(
             "animation_speed", float, 1.0, 0.0, 100.0)
+        self.zoom_level = self.bind_debug_widget(
+            "zoom_level", int, 0, 0, 5)
 
         # Recover state on a reload.
         self.panels = getattr(last_proxy, 'panels', [])
@@ -41,6 +52,12 @@ class HowToDrawALineProxy(pylive.window.WindowProxy):
         self.start_time = getattr(last_proxy, 'start_time', time.time())
         self.animtime = getattr(last_proxy, 'animtime', 0.0)
         self.active_panel = getattr(last_proxy, 'active_panel', -1)
+        self.mouse_position = getattr(last_proxy, 'mouse_position', (0,0))
+
+    def on_mouse(self, x, y):
+        if self.pan_enabled.value:
+            self.mouse_position = (x, (self.window.height - y - 1))
+            self.window.update()
 
     def on_idle(self):
         if self.animate.value:
@@ -54,8 +71,15 @@ class HowToDrawALineProxy(pylive.window.WindowProxy):
         elif key == ord('t'):
             self.transparent.value = not self.transparent.value
             self.window.update()
+        elif key == ord('p'):
+            self.pan_enabled.value = not self.pan_enabled.value
+            self.window.update()
         elif key == ord('o'):
             self.use_gl.value = not self.use_gl.value
+            self.window.update()
+        elif key == ord('z'):
+            self.zoom_level.value = (
+                self.zoom_level.value + 1) % self.zoom_level.value_max
             self.window.update()
         elif key >= ord('1') and key <= ord('9'):
             panel = {
@@ -103,9 +127,10 @@ class HowToDrawALineProxy(pylive.window.WindowProxy):
         glColor3f(.9, .9, .9)
         glRectf(0, 0, (self.frame/10. % self.window.width), 12)
         glColor3f(.5, .5, .5)
-        draw_string(1, 1, "Use GL: %s, Animate: %s, Time: %.2fs" % (
+        draw_string(1, 1, "Use GL: %s, Animate: %s, Zoom: %d, Time: %.2fs" % (
             "Yes" if self.use_gl.value else "No",
             "Yes" if self.animate.value else "No",
+            1 << self.zoom_level.value,
             self.animtime))
 
         # Organize our displays into a grid.
@@ -126,7 +151,23 @@ class HowToDrawALineProxy(pylive.window.WindowProxy):
         cell_width = (self.window.width - 2*padding) // columns - padding
         cell_height = (self.window.height - 2*padding -
                        bottom_padding) // rows - padding
-        
+
+        glPushMatrix()
+        zoom = 1 << self.zoom_level.value
+        if zoom != 1:
+            total_width = self.window.width * zoom
+            total_height = self.window.height * zoom
+            dx = clamp(float(self.mouse_position[0]) / self.window.width,
+                       0.0, 1.0)
+            dy = clamp(float(self.mouse_position[1]) / self.window.height,
+                       0.0, 1.0)
+            offset_x = (total_width - self.window.width) * dx
+            offset_y = (total_height - self.window.height) * dy
+            glTranslatef(-offset_x, -offset_y, 0)
+            self.offset = (offset_x, offset_y)
+        else:
+            self.offset = (0, 0)
+
         for column in range(columns):
             for row in range(rows):
                 panel_idx = row * columns + column
@@ -141,28 +182,52 @@ class HowToDrawALineProxy(pylive.window.WindowProxy):
                     glColor3f(.7, 0, 0)
                 else:
                     glColor3f(0, 0, 0)
-                glBegin(GL_LINE_LOOP)
-                glVertex2f(x, y)
-                glVertex2f(x + cell_width, y)
-                glVertex2f(x + cell_width, y + cell_height)
-                glVertex2f(x, y + cell_height)
-                glEnd()
+                p0 = (x, y)
+                p1 = (x + cell_width, y)
+                p2 = (x + cell_width, y + cell_height)
+                p3 = (x, y + cell_height)
+                self.draw_line_list([(p0, p1), (p1, p2), (p2, p3), (p3, p0)])
 
                 display = getattr(self, panel)
                 display(x, y, cell_width, cell_height)
+        glPopMatrix()
 
     def draw_line_list(self, lines):
-        if self.use_gl.value:
-            glBegin(GL_LINES)
-            for p0,p1 in lines:
-                glVertex2fv(p0)
-                glVertex2fv(p1)
-            glEnd()
+        zoom = 1 << self.zoom_level.value
+        if zoom == 1:
+            if self.use_gl.value:
+                glBegin(GL_LINES)
+                for p0,p1 in lines:
+                    glVertex2fv(p0)
+                    glVertex2fv(p1)
+                glEnd()
+            else:
+                glBegin(GL_POINTS)
+                for (x0,y0),(x1,y1) in lines:
+                    for x,y in line.line2d(x0, y0, x1, y1):
+                        glVertex2f(x+.5, y+.5)
+                glEnd()
         else:
+            line_impl = linegl.line2d if self.use_gl.value else line.line2d
+            w = self.window.width
+            h = self.window.height
             glBegin(GL_POINTS)
             for (x0,y0),(x1,y1) in lines:
-                for x0,y0 in line.line2d(x0, y0, x1, y1):
-                    glVertex2f(x0+.5, y0+.5)
+                # Clip lines totally out of the viewport.
+                x0t = x0*zoom - self.offset[0]
+                x1t = x1*zoom - self.offset[0]
+                y0t = y0*zoom - self.offset[1]
+                y1t = y1*zoom - self.offset[1]
+                if (x0t < 0 and x1t < 0) or \
+                   (x0t > w and x1t > w) or \
+                   (y0t < 0 and y1t < 0) or \
+                   (y0t > h and y1t > h):
+                    continue
+
+                for x,y in line.line2d(x0, y0, x1, y1):
+                    for i in range(zoom):
+                        for j in range(zoom):
+                            glVertex2f(x*zoom + i + +.5, y*zoom + j + +.5)
             glEnd()
 
     def display_trivial_lines(self, x, y, w, h):
