@@ -19,10 +19,7 @@ def draw_string(x, y, string):
 class HowToDrawALineProxy(pylive.window.WindowProxy):
     def __init__(self, window, last_proxy=None):
         super(HowToDrawALineProxy, self).__init__(window)
-        self.frame = 0
-        self.start_time = time.time()
         self.last_frame_time = None
-        self.animtime = 0.0
 
         # Bind several debug widgets.
         self.animate = self.bind_debug_widget(
@@ -37,10 +34,10 @@ class HowToDrawALineProxy(pylive.window.WindowProxy):
             "animation_speed", float, 1.0, 0.0, 100.0)
 
         # Recover state on a reload.
-        if last_proxy is not None:
-            self.frame = last_proxy.frame
-            self.start_time = last_proxy.start_time
-            self.animtime = getattr(last_proxy, 'animtime', 0.0)
+        self.panels = getattr(last_proxy, 'panels', [])
+        self.frame = getattr(last_proxy, 'frame', 0)
+        self.start_time = getattr(last_proxy, 'start_time', time.time())
+        self.animtime = getattr(last_proxy, 'animtime', 0.0)
 
     def on_idle(self):
         if self.animate.value:
@@ -54,7 +51,19 @@ class HowToDrawALineProxy(pylive.window.WindowProxy):
         elif key == ord('g'):
             self.use_gl.value = not self.use_gl.value
             self.window.update()
-
+        elif key >= ord('1') and key <= ord('9'):
+            panel = { '1' : 'display_trivial_lines',
+                      '2' : 'display_simple_lines',
+                      '3' : 'display_circle',
+                      '4' : 'display_pinwheel' }.get(chr(key))
+            if panel is not None:
+                # Remove the panel, if it exists.
+                if panel in self.panels:
+                    self.panels.remove(panel)
+                else:
+                    self.panels.append(panel)
+                self.window.update()
+            
     def on_draw(self):
         # Handle animation.
         if self.animate.value:
@@ -75,12 +84,21 @@ class HowToDrawALineProxy(pylive.window.WindowProxy):
             "Yes" if self.animate.value else "No",
             self.animtime))
 
-        # Enable several displays of our line drawing algorithm, along a grid.
-        # organized in a 3 x 4 grid.
+        # Organize our displays into a grid.
+        if len(self.panels) <= 1:
+            rows = columns = 1
+        elif len(self.panels) <= 2:
+            columns = 1
+            rows = 2
+        elif len(self.panels) <= 4:
+            columns = 2
+            rows = 2
+        elif len(self.panels) <= 6:
+            columns = 2
+            rows = 3
+
         padding = 10
         bottom_padding = 50
-        rows = 3
-        columns = 2
         cell_width = (self.window.width - 2*padding) // columns - padding
         cell_height = (self.window.height - 2*padding -
                        bottom_padding) // rows - padding
@@ -88,6 +106,12 @@ class HowToDrawALineProxy(pylive.window.WindowProxy):
         glTranslatef(.375, .375, 0)
         for column in range(columns):
             for row in range(rows):
+                panel_idx = column * rows + row
+                if panel_idx >= len(self.panels):
+                    break
+
+                panel = self.panels[panel_idx]
+                
                 x = padding + column * (cell_width + padding)
                 y = bottom_padding + padding + row * (cell_height + padding)
                 glColor3f(0, 0, 0)
@@ -98,16 +122,30 @@ class HowToDrawALineProxy(pylive.window.WindowProxy):
                 glVertex2f(x - 0.375, y + cell_height - 0.375)
                 glEnd()
 
-                if (column, row) == (0, 1):
-                    display = self.display_simple_lines
-                elif (column, row) == (1, 1):
-                    display = self.display_circle
-                elif (column, row) == (0, 0):
-                    display = self.display_pinwheel
-                else:
-                    display = None
-                if display is not None:
-                    display(x, y, cell_width, cell_height)
+                display = getattr(self, panel)
+                display(x, y, cell_width, cell_height)
+
+    def display_trivial_lines(self, x, y, w, h):
+        # Display lines at 9 different orientations.
+        rows = 3
+        columns = 3
+        glColor3f(0, 0, 0)
+        glBegin(GL_LINES if self.use_gl.value else GL_POINTS)
+        l = min(float(w)/columns, float(h)/rows) * .8
+        cx = x + w/2.
+        cy = y + h/2.
+        l = min(w, h)
+        x0 = cx - l*.5*.8
+        y0 = cy - l*.5*.2
+        x1 = cx + l*.5*.8
+        y1 = cy + l*.5*.2
+        if self.use_gl.value:
+            glVertex2f(x0 - 0.375, y0 - 0.375)
+            glVertex2f(x1 - 0.375, y1 - 0.375)
+        else:
+            for pt in line.line2d(x0, y0, x1, y1):
+                glVertex2fv(pt)
+        glEnd()
 
     def display_simple_lines(self, x, y, w, h):
         # Display lines at 9 different orientations.
@@ -152,9 +190,9 @@ class HowToDrawALineProxy(pylive.window.WindowProxy):
             a_0 = 2*math.pi * t_0 + angle_offset * 2 * math.pi
             a_1 = 2*math.pi * t_1 + angle_offset * 2 * math.pi
             x0 = cx + math.cos(a_0)*l*.5
-            y0 = cx + math.sin(a_0)*l*.5
+            y0 = cy + math.sin(a_0)*l*.5
             x1 = cx + math.cos(a_1)*l*.5
-            y1 = cx + math.sin(a_1)*l*.5
+            y1 = cy + math.sin(a_1)*l*.5
             if self.use_gl.value:
                 glVertex2f(x0 - 0.375, y0 - 0.375)
                 glVertex2f(x1 - 0.375, y1 - 0.375)
