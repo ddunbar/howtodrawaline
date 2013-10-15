@@ -111,7 +111,6 @@ class HowToDrawALineProxy(pylive.window.WindowProxy):
         cell_height = (self.window.height - 2*padding -
                        bottom_padding) // rows - padding
         
-        glTranslatef(.375, .375, 0)
         for column in range(columns):
             for row in range(rows):
                 panel_idx = column * rows + row
@@ -124,21 +123,33 @@ class HowToDrawALineProxy(pylive.window.WindowProxy):
                 y = bottom_padding + padding + row * (cell_height + padding)
                 glColor3f(0, 0, 0)
                 glBegin(GL_LINE_LOOP)
-                glVertex2f(x - 0.375, y - 0.375)
-                glVertex2f(x + cell_width - 0.375, y - 0.375)
-                glVertex2f(x + cell_width - 0.375, y + cell_height - 0.375)
-                glVertex2f(x - 0.375, y + cell_height - 0.375)
+                glVertex2f(x, y)
+                glVertex2f(x + cell_width, y)
+                glVertex2f(x + cell_width, y + cell_height)
+                glVertex2f(x, y + cell_height)
                 glEnd()
 
                 display = getattr(self, panel)
                 display(x, y, cell_width, cell_height)
 
+    def draw_line_list(self, lines):
+        if self.use_gl.value:
+            glBegin(GL_LINES)
+            for p0,p1 in lines:
+                glVertex2fv(p0)
+                glVertex2fv(p1)
+            glEnd()
+        else:
+            glBegin(GL_POINTS)
+            for (x0,y0),(x1,y1) in lines:
+                for x0,y0 in line.line2d(x0, y0, x1, y1):
+                    glVertex2f(x0+.5, y0+.5)
+            glEnd()
+
     def display_trivial_lines(self, x, y, w, h):
         # Display lines at 9 different orientations.
         rows = 3
         columns = 3
-        glColor3f(0, 0, 0)
-        glBegin(GL_LINES if self.use_gl.value else GL_POINTS)
         l = min(float(w)/columns, float(h)/rows) * .8
         cx = x + w/2.
         cy = y + h/2.
@@ -147,20 +158,16 @@ class HowToDrawALineProxy(pylive.window.WindowProxy):
         y0 = cy - l*.5*.2
         x1 = cx + l*.5*.8
         y1 = cy + l*.5*.2
-        if self.use_gl.value:
-            glVertex2f(x0 - 0.375, y0 - 0.375)
-            glVertex2f(x1 - 0.375, y1 - 0.375)
-        else:
-            for pt in line.line2d(x0, y0, x1, y1):
-                glVertex2fv(pt)
-        glEnd()
+
+        glColor3f(0, 0, 0)
+        self.draw_line_list([((x0, y0), (x1, y1))])
 
     def display_simple_lines(self, x, y, w, h):
         # Display lines at 9 different orientations.
         rows = 3
         columns = 3
         glColor3f(0, 0, 0)
-        glBegin(GL_LINES if self.use_gl.value else GL_POINTS)
+        lines = []
         l = min(float(w)/columns, float(h)/rows) * .8
         for i in range(columns):
             for j in range(rows):
@@ -172,13 +179,10 @@ class HowToDrawALineProxy(pylive.window.WindowProxy):
                 y0 = y + int(cy - math.sin(r)*l*.5)
                 x1 = x + int(cx + math.cos(r)*l*.5)
                 y1 = y + int(cy + math.sin(r)*l*.5)
-                if self.use_gl.value:
-                    glVertex2f(x0 - 0.375, y0 - 0.375)
-                    glVertex2f(x1 - 0.375, y1 - 0.375)
-                else:
-                    for pt in line.line2d(x0, y0, x1, y1):
-                        glVertex2fv(pt)
-        glEnd()
+                lines.append( ((x0,y0), (x1,y1)) )
+
+        glColor3f(0, 0, 0)
+        self.draw_line_list(lines)
 
     def display_circle(self, x, y, w, h):
         N = self.circle_num_points.value # + int(self.frame/10. % 20)
@@ -187,14 +191,7 @@ class HowToDrawALineProxy(pylive.window.WindowProxy):
         cy = y + h/2.
         l = min(w,h) * .8
 
-        if self.transparent.value:
-            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-            glEnable(GL_BLEND)
-            glColor4f(0., 0., 0., .5)
-        else:
-            glColor3f(0, 0, 0)
-
-        glBegin(GL_LINES if self.use_gl.value else GL_POINTS)
+        lines = []
         for i in range(N):
             t_0 = float(i) / N
             t_1 = float(i + 1) / N
@@ -204,15 +201,17 @@ class HowToDrawALineProxy(pylive.window.WindowProxy):
             y0 = cy + math.sin(a_0)*l*.5
             x1 = cx + math.cos(a_1)*l*.5
             y1 = cy + math.sin(a_1)*l*.5
-            if self.use_gl.value:
-                glVertex2f(x0 - 0.375, y0 - 0.375)
-                glVertex2f(x1 - 0.375, y1 - 0.375)
-            else:
-                for pt in line.line2d(x0, y0, x1, y1):
-                    glVertex2fv(pt)
-        glEnd()
+            lines.append( ((x0,y0), (x1,y1)) )
 
-        glDisable(GL_BLEND)
+        if self.transparent.value:
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+            glEnable(GL_BLEND)
+            glColor4f(0., 0., 0., .5)
+            self.draw_line_list(lines)
+            glDisable(GL_BLEND)
+        else:
+            glColor3f(0, 0, 0)
+            self.draw_line_list(lines)
 
     def display_pinwheel(self, x, y, w, h):
         N = self.circle_num_points.value # + int(self.frame/10. % 20)
@@ -221,8 +220,7 @@ class HowToDrawALineProxy(pylive.window.WindowProxy):
         cy = y + h/2.
         l = min(w,h) * .8
 
-        glColor3f(0, 0, 0)
-        glBegin(GL_LINES if self.use_gl.value else GL_POINTS)
+        lines = []
         for i in range(N):
             t_0 = float(i) / N
             t_1 = float(i + 1) / N
@@ -232,12 +230,7 @@ class HowToDrawALineProxy(pylive.window.WindowProxy):
             y0 = cy + math.sin(a_0)*l*.5
             x1 = cx + math.cos(a_1)*l*.5
             y1 = cy + math.sin(a_1)*l*.5
-            if self.use_gl.value:
-                glVertex2f(x0 - 0.375, y0 - 0.375)
-                glVertex2f(x1 - 0.375, y1 - 0.375)
-            else:
-                for pt in line.line2d(x0, y0, x1, y1):
-                    glVertex2fv(pt)
+            lines.append( ((x0,y0), (x1,y1)) )
 
         num_lines = self.pinwheel_num_lines.value
         for i in range(num_lines):
@@ -247,13 +240,10 @@ class HowToDrawALineProxy(pylive.window.WindowProxy):
             y0 = cy - math.sin(angle)*l*.5
             x1 = cx + math.cos(angle)*l*.5
             y1 = cy + math.sin(angle)*l*.5
-            if self.use_gl.value:
-                glVertex2f(x0 - 0.375, y0 - 0.375)
-                glVertex2f(x1 - 0.375, y1 - 0.375)
-            else:
-                for pt in line.line2d(x0, y0, x1, y1):
-                    glVertex2fv(pt)
-        glEnd()
+            lines.append( ((x0,y0), (x1,y1)) )
+
+        glColor3f(0, 0, 0)
+        self.draw_line_list(lines)
 
     def display_slow_moving_line(self, x, y, w, h):
         x0 = x + 5
@@ -262,14 +252,7 @@ class HowToDrawALineProxy(pylive.window.WindowProxy):
         y1 = y0 + 1
 
         glColor3f(0, 0, 0)
-        glBegin(GL_LINES if self.use_gl.value else GL_POINTS)
-        if self.use_gl.value:
-            glVertex2f(x0 - 0.375, y0 - 0.375)
-            glVertex2f(x1 - 0.375, y1 - 0.375)
-        else:
-            for pt in line.line2d(x0, y0, x1, y1):
-                glVertex2fv(pt)
-        glEnd()
+        self.draw_line_list([((x0, y0), (x1, y1))])
 
 def register_pylive(window, last_proxy=None):
     if last_proxy is not None:
