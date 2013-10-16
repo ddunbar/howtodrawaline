@@ -185,20 +185,21 @@ class HowToDrawALineProxy(pylive.window.WindowProxy):
                 x = padding + column * (cell_width + padding)
                 y = bottom_padding + padding + row * (cell_height + padding)
                 if panel_idx == self.active_panel:
-                    glColor3f(.7, 0, 0)
+                    color = (.7, 0, 0, 1)
                 else:
-                    glColor3f(0, 0, 0)
+                    color = (0, 0, 0, 1)
                 p0 = (x, y)
                 p1 = (x + cell_width, y)
                 p2 = (x + cell_width, y + cell_height)
                 p3 = (x, y + cell_height)
-                self.draw_line_list([(p0, p1), (p1, p2), (p2, p3), (p3, p0)])
+                self.draw_line_list([(p0, p1), (p1, p2), (p2, p3), (p3, p0)],
+                                    color)
 
                 display = getattr(self, panel)
                 display(x, y, cell_width, cell_height)
         glPopMatrix()
 
-    def draw_line_list(self, lines):
+    def draw_line_list(self, lines, color=(0, 0, 0, 0)):
         zoom = 1 << self.zoom_level.value
         if self.antialias.value:
             line_impl = aline.aline2d
@@ -221,15 +222,16 @@ class HowToDrawALineProxy(pylive.window.WindowProxy):
                     continue
 
                 for x,y,c in line_impl(x0, y0, x1, y1):
+                    glColor4f(color[0], color[1], color[2], c)
                     for i in range(zoom):
                         for j in range(zoom):
-                            glColor4f(0, 0, 0, c)
                             glVertex2f(x*zoom + i + +.5, y*zoom + j + +.5)
             glEnd()
             glDisable(GL_BLEND)
 
             return
 
+        glColor4fv(color)
         if zoom == 1:
             if self.use_gl.value:
                 glBegin(GL_LINES)
@@ -279,14 +281,12 @@ class HowToDrawALineProxy(pylive.window.WindowProxy):
         x1 = cx + l*.5*.8
         y1 = cy + l*.5*.2
 
-        glColor3f(0, 0, 0)
         self.draw_line_list([((x0, y0), (x1, y1))])
 
     def display_simple_lines(self, x, y, w, h):
         # Display lines at 9 different orientations.
         rows = 3
         columns = 3
-        glColor3f(0, 0, 0)
         lines = []
         l = min(float(w)/columns, float(h)/rows) * .8
         for i in range(columns):
@@ -301,7 +301,6 @@ class HowToDrawALineProxy(pylive.window.WindowProxy):
                 y1 = y + int(cy + math.sin(r)*l*.5)
                 lines.append( ((x0,y0), (x1,y1)) )
 
-        glColor3f(0, 0, 0)
         self.draw_line_list(lines)
 
     def display_circle(self, x, y, w, h):
@@ -326,11 +325,9 @@ class HowToDrawALineProxy(pylive.window.WindowProxy):
         if self.transparent.value:
             glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
             glEnable(GL_BLEND)
-            glColor4f(0., 0., 0., .5)
-            self.draw_line_list(lines)
+            self.draw_line_list(lines, color=(0., 0., 0., .5))
             glDisable(GL_BLEND)
         else:
-            glColor3f(0, 0, 0)
             self.draw_line_list(lines)
 
     def display_pinwheel(self, x, y, w, h):
@@ -362,7 +359,6 @@ class HowToDrawALineProxy(pylive.window.WindowProxy):
             y1 = cy + math.sin(angle)*l*.5
             lines.append( ((x0,y0), (x1,y1)) )
 
-        glColor3f(0, 0, 0)
         self.draw_line_list(lines)
 
     def display_slow_moving_line(self, x, y, w, h):
@@ -371,7 +367,6 @@ class HowToDrawALineProxy(pylive.window.WindowProxy):
         y0 = y + 5 + (h - 10) * math.fmod(self.animtime * .01, 1.0)
         y1 = y0 + 1
 
-        glColor3f(0, 0, 0)
         self.draw_line_list([((x0, y0), (x1, y1))])
 
 def register_pylive(window, last_proxy=None):
