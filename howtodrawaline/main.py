@@ -36,6 +36,12 @@ class HowToDrawALineProxy(pylive.window.WindowProxy):
             "transparent", bool, False, False, True)
         self.antialias = self.bind_debug_widget(
             "antialias", bool, False, False, True)
+        self.draw_grid = self.bind_debug_widget(
+            "draw_grid", bool, False, False, True)
+        self.draw_diamonds = self.bind_debug_widget(
+            "draw_diamonds", bool, False, False, True)
+        self.draw_ideal = self.bind_debug_widget(
+            "draw_ideal", bool, False, False, True)
         self.use_gl = self.bind_debug_widget(
             "use_gl", bool, False, False, True)
         self.pan_enabled = self.bind_debug_widget(
@@ -47,7 +53,7 @@ class HowToDrawALineProxy(pylive.window.WindowProxy):
         self.animation_speed = self.bind_debug_widget(
             "animation_speed", float, 1.0, 0.0, 100.0)
         self.zoom_level = self.bind_debug_widget(
-            "zoom_level", int, 0, 0, 4)
+            "zoom_level", int, 0, 0, 5)
 
         # Recover state on a reload.
         self.panels = getattr(last_proxy, 'panels', [])
@@ -73,6 +79,15 @@ class HowToDrawALineProxy(pylive.window.WindowProxy):
             self.window.update()
         elif key == ord('s'):
             self.antialias.value = not self.antialias.value
+            self.window.update()
+        elif key == ord('g'):
+            self.draw_grid.value = not self.draw_grid.value
+            self.window.update()
+        elif key == ord('d'):
+            self.draw_diamonds.value = not self.draw_diamonds.value
+            self.window.update()
+        elif key == ord('i'):
+            self.draw_ideal.value = not self.draw_ideal.value
             self.window.update()
         elif key == ord('t'):
             self.transparent.value = not self.transparent.value
@@ -197,10 +212,42 @@ class HowToDrawALineProxy(pylive.window.WindowProxy):
 
                 display = getattr(self, panel)
                 display(x, y, cell_width, cell_height)
+
+
+        # Draw diamonds around each pixel, if enabled.
+        if self.draw_grid.value and zoom >= 8:
+            xlines = int(math.floor(self.window.width))
+            ylines = int(math.floor(self.window.height))
+            ll = (0, 0)
+            ur = (self.window.width, self.window.height)
+            glColor3f(0, 0, 0)
+            glBegin(GL_LINES)
+            for x in range(xlines):
+                glVertex2f((ll[0] + x)*zoom, ll[1]*zoom + .5)
+                glVertex2f((ll[0] + x)*zoom, ur[1]*zoom + .5)
+            for y in range(ylines):
+                glVertex2f(ll[0]*zoom + .5, (ll[1] + y)*zoom)
+                glVertex2f(ur[0]*zoom + .5, (ll[1] + y)*zoom)
+            glEnd()
+        if self.draw_diamonds.value and zoom >= 8:
+            xlines = int(math.floor(self.window.width))
+            ylines = int(math.floor(self.window.height))
+            ll = (0, 0)
+            ur = (self.window.width, self.window.height)
+            glColor3f(0, .8, 0)
+            glBegin(GL_LINES)
+            for i in range(self.window.width + self.window.height):
+                glVertex2f(0, (i+.5)*zoom)
+                glVertex2f((i+.5)*zoom, 0)
+                glVertex2f(self.window.width*zoom, (i+.5)*zoom)
+                glVertex2f(self.window.width*zoom - (i+.5)*zoom, 0)
+            glEnd()
+        
         glPopMatrix()
 
     def draw_line_list(self, lines, color=(0, 0, 0, 0)):
         zoom = 1 << self.zoom_level.value
+            
         if self.antialias.value:
             line_impl = aline.aline2d
             w = self.window.width
@@ -228,44 +275,50 @@ class HowToDrawALineProxy(pylive.window.WindowProxy):
                             glVertex2f(x*zoom + i + +.5, y*zoom + j + +.5)
             glEnd()
             glDisable(GL_BLEND)
-
-            return
-
-        glColor4fv(color)
-        if zoom == 1:
-            if self.use_gl.value:
-                glBegin(GL_LINES)
-                for p0,p1 in lines:
-                    glVertex2fv(p0)
-                    glVertex2fv(p1)
-                glEnd()
+        else:
+            glColor4fv(color)
+            if zoom == 1:
+                if self.use_gl.value:
+                    glBegin(GL_LINES)
+                    for p0,p1 in lines:
+                        glVertex2fv(p0)
+                        glVertex2fv(p1)
+                    glEnd()
+                else:
+                    glBegin(GL_POINTS)
+                    for (x0,y0),(x1,y1) in lines:
+                        for x,y in line.line2d(x0, y0, x1, y1):
+                            glVertex2f(x+.5, y+.5)
+                    glEnd()
             else:
+                line_impl = linegl.line2d if self.use_gl.value else line.line2d
+                w = self.window.width
+                h = self.window.height
                 glBegin(GL_POINTS)
                 for (x0,y0),(x1,y1) in lines:
-                    for x,y in line.line2d(x0, y0, x1, y1):
-                        glVertex2f(x+.5, y+.5)
-                glEnd()
-        else:
-            line_impl = linegl.line2d if self.use_gl.value else line.line2d
-            w = self.window.width
-            h = self.window.height
-            glBegin(GL_POINTS)
-            for (x0,y0),(x1,y1) in lines:
-                # Clip lines totally out of the viewport.
-                x0t = x0*zoom - self.offset[0]
-                x1t = x1*zoom - self.offset[0]
-                y0t = y0*zoom - self.offset[1]
-                y1t = y1*zoom - self.offset[1]
-                if (x0t < 0 and x1t < 0) or \
-                   (x0t > w and x1t > w) or \
-                   (y0t < 0 and y1t < 0) or \
-                   (y0t > h and y1t > h):
-                    continue
+                    # Clip lines totally out of the viewport.
+                    x0t = x0*zoom - self.offset[0]
+                    x1t = x1*zoom - self.offset[0]
+                    y0t = y0*zoom - self.offset[1]
+                    y1t = y1*zoom - self.offset[1]
+                    if (x0t < 0 and x1t < 0) or \
+                       (x0t > w and x1t > w) or \
+                       (y0t < 0 and y1t < 0) or \
+                       (y0t > h and y1t > h):
+                        continue
 
-                for x,y in line_impl(x0, y0, x1, y1):
-                    for i in range(zoom):
-                        for j in range(zoom):
-                            glVertex2f(x*zoom + i + +.5, y*zoom + j + +.5)
+                    for x,y in line_impl(x0, y0, x1, y1):
+                        for i in range(zoom):
+                            for j in range(zoom):
+                                glVertex2f(x*zoom + i + +.5, y*zoom + j + +.5)
+                glEnd()
+
+        if self.draw_ideal.value and zoom > 1:
+            glColor3f(1, 0, 0)
+            glBegin(GL_LINES)
+            for (x0,y0),(x1,y1) in lines:
+                glVertex2f((x0 + .5)*zoom, (y0 + .5)*zoom)
+                glVertex2f((x1 + .5)*zoom, (y1 + .5)*zoom)
             glEnd()
 
     def display_trivial_lines(self, x, y, w, h):
