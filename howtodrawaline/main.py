@@ -8,6 +8,7 @@ from OpenGL.GL import *
 import pylive.window
 
 import line
+import aline
 import linegl
 
 def clamp(value, lower, upper):
@@ -33,6 +34,8 @@ class HowToDrawALineProxy(pylive.window.WindowProxy):
             "animate", bool, False, False, True)
         self.transparent = self.bind_debug_widget(
             "transparent", bool, False, False, True)
+        self.antialias = self.bind_debug_widget(
+            "antialias", bool, False, False, True)
         self.use_gl = self.bind_debug_widget(
             "use_gl", bool, False, False, True)
         self.pan_enabled = self.bind_debug_widget(
@@ -44,7 +47,7 @@ class HowToDrawALineProxy(pylive.window.WindowProxy):
         self.animation_speed = self.bind_debug_widget(
             "animation_speed", float, 1.0, 0.0, 100.0)
         self.zoom_level = self.bind_debug_widget(
-            "zoom_level", int, 0, 0, 5)
+            "zoom_level", int, 0, 0, 4)
 
         # Recover state on a reload.
         self.panels = getattr(last_proxy, 'panels', [])
@@ -67,6 +70,9 @@ class HowToDrawALineProxy(pylive.window.WindowProxy):
         if key == ord('a'):
             self.animate.value = not self.animate.value
             self.last_frame_time = time.time()
+            self.window.update()
+        elif key == ord('s'):
+            self.antialias.value = not self.antialias.value
             self.window.update()
         elif key == ord('t'):
             self.transparent.value = not self.transparent.value
@@ -194,6 +200,36 @@ class HowToDrawALineProxy(pylive.window.WindowProxy):
 
     def draw_line_list(self, lines):
         zoom = 1 << self.zoom_level.value
+        if self.antialias.value:
+            line_impl = aline.aline2d
+            w = self.window.width
+            h = self.window.height
+
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+            glEnable(GL_BLEND)
+            glBegin(GL_POINTS)
+            for (x0,y0),(x1,y1) in lines:
+                # Clip lines totally out of the viewport.
+                x0t = x0*zoom - self.offset[0]
+                x1t = x1*zoom - self.offset[0]
+                y0t = y0*zoom - self.offset[1]
+                y1t = y1*zoom - self.offset[1]
+                if (x0t < 0 and x1t < 0) or \
+                   (x0t > w and x1t > w) or \
+                   (y0t < 0 and y1t < 0) or \
+                   (y0t > h and y1t > h):
+                    continue
+
+                for x,y,c in line_impl(x0, y0, x1, y1):
+                    for i in range(zoom):
+                        for j in range(zoom):
+                            glColor4f(0, 0, 0, c)
+                            glVertex2f(x*zoom + i + +.5, y*zoom + j + +.5)
+            glEnd()
+            glDisable(GL_BLEND)
+
+            return
+
         if zoom == 1:
             if self.use_gl.value:
                 glBegin(GL_LINES)
