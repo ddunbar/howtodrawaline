@@ -22,7 +22,7 @@ def clamp(value, lower, upper):
 def draw_string(x, y, string):
     glRasterPos2f(x, y)
     for c in string:
-        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_10, ord(c))
+        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, ord(c))
 
 class HowToDrawALineProxy(pylive.window.WindowProxy):
     def __init__(self, window, last_proxy=None):
@@ -72,44 +72,45 @@ class HowToDrawALineProxy(pylive.window.WindowProxy):
         if self.animate.value:
             self.window.update()
 
-    def on_special(self, key, x, y):
-        if key == ord('a'):
+    def on_key(self, key, x, y):
+        print(key)
+        if key == 'a':
             self.animate.value = not self.animate.value
             self.last_frame_time = time.time()
             self.window.update()
-        elif key == ord('s'):
+        elif key == 's':
             self.antialias.value = not self.antialias.value
             self.window.update()
-        elif key == ord('g'):
+        elif key == 'g':
             self.draw_grid.value = not self.draw_grid.value
             self.window.update()
-        elif key == ord('d'):
+        elif key == 'd':
             self.draw_diamonds.value = not self.draw_diamonds.value
             self.window.update()
-        elif key == ord('i'):
+        elif key == 'i':
             self.draw_ideal.value = not self.draw_ideal.value
             self.window.update()
-        elif key == ord('t'):
+        elif key == 't':
             self.transparent.value = not self.transparent.value
             self.window.update()
-        elif key == ord('p'):
+        elif key == 'p':
             self.pan_enabled.value = not self.pan_enabled.value
             self.window.update()
-        elif key == ord('o'):
+        elif key == 'o':
             self.use_gl.value = not self.use_gl.value
             self.window.update()
-        elif key == ord('z'):
+        elif key == 'z':
             self.zoom_level.value = (
                 self.zoom_level.value + 1) % self.zoom_level.value_max
             self.window.update()
-        elif key >= ord('1') and key <= ord('9'):
+        elif key >= '1' and key <= '9':
             panel = {
                 '1' : 'display_trivial_lines',
                 '2' : 'display_simple_lines',
                 '3' : 'display_circle',
                 '4' : 'display_pinwheel',
                 '5' : 'display_slow_moving_line',
-            }.get(chr(key))
+            }.get(key)
             if panel is not None:
                 # Remove the panel, if it exists.
                 if panel in self.panels:
@@ -117,7 +118,9 @@ class HowToDrawALineProxy(pylive.window.WindowProxy):
                 else:
                     self.panels.append(panel)
                 self.window.update()
-        elif key == GLUT_KEY_LEFT:
+
+    def on_special(self, key, x, y):
+        if key == int(GLUT_KEY_LEFT):
             self.active_panel = max(self.active_panel - 1, -1)
             self.window.update()
         elif key == GLUT_KEY_RIGHT:
